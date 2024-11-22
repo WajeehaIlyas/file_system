@@ -13,6 +13,7 @@
 #define DIRECTORY_SIZE 128  // Max number of entries in the root directory
 #define FREE -1  // Representing free blocks
 #define MAX_FILES 100
+#define MAX_DIRECTORIES 100
 #define DISK_FILE "disk.fs"
 
 // File Allocation Table (FAT)
@@ -27,18 +28,18 @@ typedef struct {
 } File;
 
 typedef struct {
+    char name[MAX_FILE_NAME_SIZE];
+    int parent_index;
     int file_count;
     File files[DIRECTORY_SIZE];
+    int child_count;
+    int children[MAX_DIRECTORIES];
 } Directory;
 
 // Global root directory
-extern Directory root_directory;
-
-// Function prototypes
-void initialize_fat();
-int find_free_block();
-void write_to_disk();
-void load_from_disk();
+extern Directory directories[MAX_DIRECTORIES];
+extern int current_directory_index;
+extern int directory_count;
 
 
 #endif
