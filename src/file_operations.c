@@ -55,26 +55,6 @@ int create_file(const char *name, const char *content) {
 /*
  * Delete a file from the root directory and free its associated blocks in FAT.
  */
-void delete_file(const char *name) {
-    Directory *current_directory = &directories[current_directory_index];
-    for (int i = 0; i < current_directory->file_count; i++) {
-        if (strcmp(current_directory->files[i].name, name) == 0) {
-            // Mark the block as free
-            FAT[current_directory->files[i].start_block] = FREE;
-
-            // Shift remaining files down
-            for (int j = i; j < current_directory->file_count - 1; j++) {
-                current_directory->files[j] = current_directory->files[j + 1];
-            }
-
-            current_directory->file_count--;
-            write_to_disk();
-            printf("File '%s' deleted successfully.\n", name);
-            return;
-        }
-    }
-    printf("File not found.\n");
-}
 
 void write_to_file(const char *name, const char *new_content) {
     Directory *current_directory = &directories[current_directory_index];
