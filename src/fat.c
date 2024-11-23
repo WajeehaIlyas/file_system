@@ -5,6 +5,7 @@ int FAT[MAX_BLOCKS];
 int directory_count;
 int current_directory_index;
 
+
 // Initialize the FAT, marking all blocks as free.
 void initialize_fat() {
     for (int i = 0; i < MAX_BLOCKS; i++) {

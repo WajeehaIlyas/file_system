@@ -288,89 +288,80 @@ void partition_file_system() {
 void simulate_fs_operations() {
     char command[100];
     printf("Simple FAT File System Simulator\n");
-    printf("Available commands:\n");
-    printf("  touch <filename>\n");
-    printf("  ls\n");
-    printf("  delete <filename>\n");
-    printf("  write <filename> <content>\n");
-    printf("  read <filename>\n");
-    printf("  truncate <filename> <new_size>\n");
-    printf("rename <old_name> <new_name>\n");
-    printf("  mkdir <dir_name>\n");
-    printf("  cd <dir_name>\n");
-    printf("  read_block <block_index>\n");
-    printf("  write_block <block_index> <content>\n");
-    printf("  partition\n");
-    printf("  exit\n");
+    printf("Type 'help' to see available commands.\n");
 
     while (1) {
         printf("Enter command: ");
         fgets(command, sizeof(command), stdin);
         command[strcspn(command, "\n")] = 0;  // Remove newline
 
-        if (strncmp(command, "touch ", 6) == 0) {
+        if (strcmp(command, "help") == 0) {
+            printf("Available commands:\n");
+            printf("  touch\n");
+            printf("  ls\n");
+            printf("  rm\n");
+            printf("  write\n");
+            printf("  read\n");
+            printf("  tcate\n");
+            printf("  mkdir\n");
+            printf("  cd\n");
+            printf("  rblock\n");
+            printf("  wblock\n");
+            printf("  part\n");
+            printf("  rname\n");
+            printf("  exit\n");
+        } else if (strncmp(command, "touch ", 6) == 0) {
             char filename[MAX_FILE_NAME_SIZE];
             sscanf(command + 6, "%s", filename);
             create_file(filename, "");
         } else if (strcmp(command, "ls") == 0) {
             list_files();
-        } else if (strncmp(command, "delete ", 7) == 0) {
+        } else if (strncmp(command, "rm ", 3) == 0) {
             char filename[MAX_FILE_NAME_SIZE];
-            sscanf(command + 7, "%s", filename);
+            sscanf(command + 3, "%s", filename);
             delete_file(filename);
-        }else if (strncmp(command, "write ", 6) == 0) {
-    char name[MAX_FILE_NAME_SIZE];
-    char new_content[1024];
-    sscanf(command + 6, "%s %[^\n]", name, new_content); // Extract filename and content
-    write_to_file(name, new_content);
-} else if (strncmp(command, "read ", 5) == 0) {
-    char name[MAX_FILE_NAME_SIZE];
-    sscanf(command + 5, "%s", name);
-    read_from_file(name);
-}
-else if (strncmp(command, "truncate ", 9) == 0) {
-    char name[MAX_FILE_NAME_SIZE];
-    int new_size;
-    sscanf(command + 9, "%s %d", name, &new_size);
-    truncate_file(name, new_size);
-}
-else if (strncmp(command, "mkdir ", 6) == 0) {
+        } else if (strncmp(command, "write ", 6) == 0) {
+            char name[MAX_FILE_NAME_SIZE];
+            char new_content[1024];
+            sscanf(command + 6, "%s %[^\n]", name, new_content); // Extract filename and content
+            write_to_file(name, new_content);
+        } else if (strncmp(command, "read ", 5) == 0) {
+            char name[MAX_FILE_NAME_SIZE];
+            sscanf(command + 5, "%s", name);
+            read_from_file(name);
+        } else if (strncmp(command, "tcate ", 6) == 0) {
+            char name[MAX_FILE_NAME_SIZE];
+            int new_size;
+            sscanf(command + 6, "%s %d", name, &new_size);
+            truncate_file(name, new_size);
+        } else if (strncmp(command, "mkdir ", 6) == 0) {
             char dir_name[MAX_FILE_NAME_SIZE];
             sscanf(command + 6, "%s", dir_name); // Extract directory name
             create_directory(dir_name);
-        }
-        else if (strncmp(command, "cd ", 3) == 0) {
+        } else if (strncmp(command, "cd ", 3) == 0) {
             char dir_name[MAX_FILE_NAME_SIZE];
             sscanf(command + 3, "%s", dir_name); // Extract directory name
             change_directory(dir_name);
-        } 
-        else if (strncmp(command, "read_block ", 11) == 0) {
+        } else if (strncmp(command, "rblock ", 7) == 0) {
             int block_index;
-            sscanf(command + 11, "%d", &block_index);
+            sscanf(command + 7, "%d", &block_index);
             read_block(block_index);
-        } else if (strncmp(command, "write_block ", 12) == 0) {
+        } else if (strncmp(command, "wblock ", 7) == 0) {
             int block_index;
             char content[1024];
-            sscanf(command + 12, "%d %[^\n]", &block_index, content);
+            sscanf(command + 7, "%d %[^\n]", &block_index, content);
             write_block(block_index, content);
-        }
-        else if (strcmp(command, "partition") == 0) {
+        } else if (strcmp(command, "part") == 0) {
             partition_file_system();
-        }
-        else if (strncmp(command, "rename ", 7) == 0) {
+        } else if (strncmp(command, "rname ", 6) == 0) {
             char old_name[MAX_FILE_NAME_SIZE];
             char new_name[MAX_FILE_NAME_SIZE];
             sscanf(command + 7, "%s %s", old_name, new_name);
             rename_file(old_name, new_name);
-        }
-        else if (strcmp(command, "exit") == 0) {
+        } else if (strcmp(command, "exit") == 0) {
             break;
-        }
-        else {
-            printf("Invalid command. Please try again.\n");
+        } else {
+            printf("Invalid command. Type 'help' to see available commands.\n");
         }
     }
 }
-
-
-

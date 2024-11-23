@@ -64,56 +64,60 @@ void write_to_file(const char *name, const char *new_content) {
             File *file = &current_directory->files[i];
 
             int new_content_size = strlen(new_content);
-            int new_total_size = file->size + new_content_size;
-
-            if (new_total_size > MAX_FILE_SIZE * BLOCK_SIZE) {
-                printf("Error: File size exceeds maximum limit of 128 KB.\n");
+            if (new_content_size > MAX_FILE_SIZE) {
+                printf("Error: File size exceeds the maximum allowed size of 1 KB.\n");
                 return;
             }
 
-            int additional_blocks_needed = (new_total_size + BLOCK_SIZE - 1) / BLOCK_SIZE
-                                           - (file->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-
-            for (int j = 0; j < additional_blocks_needed; j++) {
-                int free_block = find_free_block();
-                if (free_block == -1) {
-                    printf("Error: Not enough space on the disk to write to the file.\n");
-                    return;
-                }
-                FAT[free_block] = file->start_block;
-                file->start_block = free_block;
-            }
-
-            // Append new content to the file
             int current_block = file->start_block;
             int bytes_written = 0;
 
-            while (current_block != FREE && bytes_written < new_content_size) {
+            while (bytes_written < new_content_size) {
                 int offset = bytes_written % BLOCK_SIZE;
-                int bytes_to_write = (new_content_size - bytes_written < BLOCK_SIZE - offset)
-                                     ? new_content_size - bytes_written
-                                     : BLOCK_SIZE - offset;
+                int bytes_to_write = BLOCK_SIZE - offset; // Write as much as possible in current block
+                if (bytes_written + bytes_to_write > new_content_size) {
+                    bytes_to_write = new_content_size - bytes_written;
+                }
 
-                memcpy(&virtual_disk[current_block][offset],
+                memcpy(&virtual_disk[current_block][offset], 
                        &new_content[bytes_written], bytes_to_write);
-
                 bytes_written += bytes_to_write;
-                current_block = FAT[current_block];
+
+                // Allocate next block if needed
+                if (bytes_written < new_content_size) {
+                    if (FAT[current_block] == FREE) {
+                        int new_block = find_free_block();
+                        if (new_block == -1) {
+                            printf("Error: Not enough space to complete the write.\n");
+                            file->size = bytes_written; // Update to reflect written content
+                            write_to_disk();
+                            return;
+                        }
+                        FAT[current_block] = new_block;
+                        FAT[new_block] = FREE;
+                    }
+                    current_block = FAT[current_block];
+                }
             }
 
-            if (bytes_written % BLOCK_SIZE != 0) {
-                memset(&virtual_disk[current_block][bytes_written % BLOCK_SIZE], 0,
-                       BLOCK_SIZE - (bytes_written % BLOCK_SIZE));
+            // Truncate unused blocks if new content is smaller
+            int next_block = FAT[current_block];
+            FAT[current_block] = FREE;
+            while (next_block != FREE) {
+                int temp = FAT[next_block];
+                FAT[next_block] = FREE; // Mark block as free
+                next_block = temp;
             }
 
-            file->size = new_total_size;
-            write_to_disk();
-            printf("File '%s' updated successfully with new content.\n", name);
+            file->size = new_content_size; // Update file size
+            write_to_disk(); // Persist changes
+            printf("File '%s' content overwritten successfully.\n", name);
             return;
         }
     }
     printf("Error: File '%s' not found.\n", name);
 }
+
 
 void read_from_file(const char *name) {
     Directory *current_directory = &directories[current_directory_index];
