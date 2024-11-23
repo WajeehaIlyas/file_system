@@ -9,9 +9,9 @@ void write_to_disk() {
     fseek(disk, 0, SEEK_SET);
     fwrite(FAT, sizeof(FAT), 1, disk);
     fwrite(&directory_count, sizeof(directory_count), 1, disk);
+    fwrite(&current_directory_index, sizeof(current_directory_index), 1, disk);
     fwrite(directories, sizeof(Directory), MAX_DIRECTORIES, disk);
     fwrite(virtual_disk, sizeof(virtual_disk), 1, disk);
-    fflush(disk);
     fclose(disk);
 }
 
@@ -31,11 +31,12 @@ void load_from_disk() {
 
     // Load directory structures
     fread(&directory_count, sizeof(directory_count), 1, disk);
+    fread(&current_directory_index, sizeof(current_directory_index), 1, disk);
     fread(directories, sizeof(Directory), MAX_DIRECTORIES, disk);
 
     // Load virtual disk
     fread(virtual_disk, sizeof(virtual_disk), 1, disk);
 
     fclose(disk);
-    printf("File system loaded successfully.\n");
+   
 }

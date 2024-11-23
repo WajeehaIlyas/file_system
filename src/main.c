@@ -11,15 +11,15 @@ void list_files();
 void change_directory(const char *name);
 void delete_file(const char *name);
 void delete_directory_recursive(int dir_index);
+void rename_file(const char *old_name, const char *new_name);
 void read_block(int block_index);
 void write_block(int block_index, const char *content);
-void partition_disk();
+void partition_file_system();
 void simulate_fs_operations();
 
 // Main function to interact with the system
 int main() {
     initialize_disk();
-    initialize_dir_structure();
     simulate_fs_operations();
     return 0;
 }
@@ -28,15 +28,22 @@ int main() {
  * Initialize the FAT and root directory and ensure the disk file exists.
  */
 void initialize_disk() {
-    FILE *disk = fopen(DISK_FILE, "rb");
+    FILE *disk = fopen(DISK_FILE, "rb+");
     if (disk == NULL) {
         // Disk does not exist, create and initialize it
-        disk = fopen(DISK_FILE, "wb");
+        printf("Disk does not exist. Initializing a new file system...\n");
+        disk = fopen(DISK_FILE, "wb+");
+        if (!disk) {
+            perror("Error creating disk file");
+            exit(1);
+        }
+
         initialize_fat();
 
         // Initialize the directories array with empty directories
         for (int i = 0; i < MAX_DIRECTORIES; i++) {
-            directories[i].file_count = 0;  // Initialize each directory with 0 files
+            memset(&directories[i], 0, sizeof(Directory));  // Ensure all fields are zeroed
+            directories[i].file_count = 0;  // Explicitly set file count
         }
 
         // Write initial FAT and directories to the disk
@@ -48,10 +55,14 @@ void initialize_disk() {
         for (int i = 0; i < MAX_BLOCKS; i++) {
             fwrite(empty_block, BLOCK_SIZE, 1, disk);
         }
+
+        printf("File system initialized and written to disk.\n");
     } else {
         // Load existing FAT and directories
+        printf("Existing file system found. Loading from disk...\n");
         load_from_disk();
     }
+
     fclose(disk);
 }
 
@@ -165,6 +176,33 @@ void delete_directory_recursive(int dir_index) {
     dir->child_count = 0;
 }
 
+void rename_file(const char *old_name, const char *new_name) {
+    Directory *current_directory = &directories[current_directory_index];
+
+    // Check if it's a directory
+    for (int i = 0; i < current_directory->child_count; i++) {
+        int child_index = current_directory->children[i];
+        if (strcmp(directories[child_index].name, old_name) == 0) {
+            strcpy(directories[child_index].name, new_name);
+            write_to_disk();
+            printf("Directory '%s' renamed to '%s'.\n", old_name, new_name);
+            return;
+        }
+    }
+
+    // Check if it's a file
+    for (int i = 0; i < current_directory->file_count; i++) {
+        if (strcmp(current_directory->files[i].name, old_name) == 0) {
+            strcpy(current_directory->files[i].name, new_name);
+            write_to_disk();
+            printf("File '%s' renamed to '%s'.\n", old_name, new_name);
+            return;
+        }
+    }
+    printf("File or directory not found.\n");
+}
+
+
 void read_block(int block_index) {
     if (block_index < 0 || block_index >= MAX_BLOCKS) {
         printf("Error: Invalid block index.\n");
@@ -196,24 +234,21 @@ void write_block(int block_index, const char *content) {
         return;
     }
 
-    int existing_content_length = 0;
-    // Calculate the existing content length by counting non-null bytes
-    for (int i = 0; i < BLOCK_SIZE; i++) {
-        if (virtual_disk[block_index][i] == '\0') {
-            break;
-        }
-        existing_content_length++;
-    }
-
     int content_length = strlen(content);
 
-    if (existing_content_length + content_length > BLOCK_SIZE) {
-        printf("Error: Not enough space in the block to write the content.\n");
+    // Check if the content fits in the block
+    if (content_length > BLOCK_SIZE) {
+        printf("Error: Content is too large for the block.\n");
         return;
     }
 
-    // Write the content at the first available position
-    strncpy(virtual_disk[block_index] + existing_content_length, content, content_length);
+    // Write content to the virtual disk (update the specified block)
+    strncpy(virtual_disk[block_index], content, content_length);
+
+    // After writing to virtual_disk, persist the changes to the actual disk file
+    write_to_disk();  // This will save the changes to the disk
+
+    printf("Block %d successfully updated with content: '%s'.\n", block_index, content);
 }
 
 
@@ -250,7 +285,20 @@ void partition_file_system() {
 void simulate_fs_operations() {
     char command[100];
     printf("Simple FAT File System Simulator\n");
-    printf("Available commands: touch <filename>, ls, delete <filename>,write <filename> <content>, read <filename>, truncate <filename> <new_size>,mkdir <dir_name>, cd <dir_name>, read_block <block_index>, write_block <block_index> <content>, partition, exit\n");
+    printf("Available commands:\n");
+    printf("  touch <filename>\n");
+    printf("  ls\n");
+    printf("  delete <filename>\n");
+    printf("  write <filename> <content>\n");
+    printf("  read <filename>\n");
+    printf("  truncate <filename> <new_size>\n");
+    printf("rename <old_name> <new_name>\n");
+    printf("  mkdir <dir_name>\n");
+    printf("  cd <dir_name>\n");
+    printf("  read_block <block_index>\n");
+    printf("  write_block <block_index> <content>\n");
+    printf("  partition\n");
+    printf("  exit\n");
 
     while (1) {
         printf("Enter command: ");
@@ -305,6 +353,12 @@ else if (strncmp(command, "mkdir ", 6) == 0) {
         }
         else if (strcmp(command, "partition") == 0) {
             partition_file_system();
+        }
+        else if (strncmp(command, "rename ", 7) == 0) {
+            char old_name[MAX_FILE_NAME_SIZE];
+            char new_name[MAX_FILE_NAME_SIZE];
+            sscanf(command + 7, "%s %s", old_name, new_name);
+            rename_file(old_name, new_name);
         }
         else if (strcmp(command, "exit") == 0) {
             break;
