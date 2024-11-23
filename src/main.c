@@ -229,6 +229,11 @@ void write_block(int block_index, const char *content) {
         return;
     }
 
+    if (FAT[block_index] != FREE) {
+        printf("Error: Block %d is already in use by a file.\n", block_index);
+        return;
+    }
+
     int content_length = strlen(content);
 
     // Check if the content fits in the block
@@ -238,7 +243,10 @@ void write_block(int block_index, const char *content) {
     }
 
     // Write content to the virtual disk (update the specified block)
+    memset(virtual_disk[block_index], 0, BLOCK_SIZE);
     strncpy(virtual_disk[block_index], content, content_length);
+
+    FAT[block_index] = -2;  // Mark block as used
 
     // After writing to virtual_disk, persist the changes to the actual disk file
     write_to_disk();  // This will save the changes to the disk

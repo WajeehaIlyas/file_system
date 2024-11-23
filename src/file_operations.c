@@ -101,6 +101,11 @@ void write_to_file(const char *name, const char *new_content) {
                 current_block = FAT[current_block];
             }
 
+            if (bytes_written % BLOCK_SIZE != 0) {
+                memset(&virtual_disk[current_block][bytes_written % BLOCK_SIZE], 0,
+                       BLOCK_SIZE - (bytes_written % BLOCK_SIZE));
+            }
+
             file->size = new_total_size;
             write_to_disk();
             printf("File '%s' updated successfully with new content.\n", name);
