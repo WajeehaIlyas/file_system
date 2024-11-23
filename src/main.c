@@ -39,12 +39,7 @@ void initialize_disk() {
         }
 
         initialize_fat();
-
-        // Initialize the directories array with empty directories
-        for (int i = 0; i < MAX_DIRECTORIES; i++) {
-            memset(&directories[i], 0, sizeof(Directory));  // Ensure all fields are zeroed
-            directories[i].file_count = 0;  // Explicitly set file count
-        }
+        initialize_dir_structure();
 
         // Write initial FAT and directories to the disk
         fwrite(FAT, sizeof(FAT), 1, disk);
@@ -217,8 +212,8 @@ void read_block(int block_index) {
 
         // Replace unreadable characters with a placeholder (e.g., '.')
         if (current_char == '\0' || (current_char < 32 || current_char > 126)) {
-            printf(".");
-            free_bytes++;  // Count free bytes
+            free_bytes = BLOCK_SIZE - i;  // Calculate free bytes
+            break;
         } else {
             printf("%c", current_char);
         }

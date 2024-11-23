@@ -110,7 +110,6 @@ void write_to_file(const char *name, const char *new_content) {
     printf("Error: File '%s' not found.\n", name);
 }
 
-
 void read_from_file(const char *name) {
     Directory *current_directory = &directories[current_directory_index];
 
