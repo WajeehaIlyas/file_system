@@ -11,6 +11,7 @@ void write_to_disk() {
     fwrite(&directory_count, sizeof(directory_count), 1, disk);
     fwrite(directories, sizeof(Directory), MAX_DIRECTORIES, disk);
     fwrite(virtual_disk, sizeof(virtual_disk), 1, disk);
+    fflush(disk);
     fclose(disk);
 }
 

@@ -94,7 +94,7 @@ void write_to_file(const char *name, const char *new_content) {
                                      ? new_content_size - bytes_written
                                      : BLOCK_SIZE - offset;
 
-                memcpy(&virtual_disk[current_block * BLOCK_SIZE + offset],
+                memcpy(&virtual_disk[current_block][offset],
                        &new_content[bytes_written], bytes_to_write);
 
                 bytes_written += bytes_to_write;
@@ -132,7 +132,7 @@ void read_from_file(const char *name) {
                                     : BLOCK_SIZE;
 
                 // Print the content of the current block
-                fwrite(&virtual_disk[current_block * BLOCK_SIZE], sizeof(char), bytes_to_read, stdout);
+                fwrite(virtual_disk[current_block], sizeof(char), bytes_to_read, stdout);
                 bytes_read += bytes_to_read;
                 current_block = FAT[current_block];
             }
