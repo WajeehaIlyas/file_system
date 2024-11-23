@@ -23,6 +23,12 @@ int find_free_block() {
 }
 
 void initialize_dir_structure() {
+    // Initialize the directories array with empty directories
+    for (int i = 0; i < MAX_DIRECTORIES; i++) {
+        memset(&directories[i], 0, sizeof(Directory));  // Ensure all fields are zeroed
+        directories[i].file_count = 0;  // Explicitly set file count
+    }
+
     directory_count = 1; // Start with only the root directory
 
     // Initialize the root directory
