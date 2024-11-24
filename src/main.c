@@ -169,33 +169,59 @@ void delete_directory_recursive(int dir_index) {
     // Mark the directory as empty
     dir->file_count = 0;
     dir->child_count = 0;
+    dir->parent_index = -1;
+    memset(dir->files, 0, sizeof(dir->files));
 }
 
 void rename_file(const char *old_name, const char *new_name) {
+    if (strlen(new_name) >= MAX_FILE_NAME_SIZE) {
+        printf("Error: New name is too long.\n");
+        return;
+    }
+
     Directory *current_directory = &directories[current_directory_index];
 
-    // Check if it's a directory
+    // Check for conflicting names
+    for (int i = 0; i < current_directory->file_count; i++) {
+        if (strcmp(current_directory->files[i].name, new_name) == 0) {
+            printf("Error: A file named '%s' already exists.\n", new_name);
+            return;
+        }
+    }
+    for (int i = 0; i < current_directory->child_count; i++) {
+        int child_index = current_directory->children[i];
+        if (strcmp(directories[child_index].name, new_name) == 0) {
+            printf("Error: A directory named '%s' already exists.\n", new_name);
+            return;
+        }
+    }
+
+    // Rename directory
     for (int i = 0; i < current_directory->child_count; i++) {
         int child_index = current_directory->children[i];
         if (strcmp(directories[child_index].name, old_name) == 0) {
-            strcpy(directories[child_index].name, new_name);
+            strncpy(directories[child_index].name, new_name, MAX_FILE_NAME_SIZE);
+            directories[child_index].name[MAX_FILE_NAME_SIZE - 1] = '\0'; // Ensure null-termination
             write_to_disk();
             printf("Directory '%s' renamed to '%s'.\n", old_name, new_name);
             return;
         }
     }
 
-    // Check if it's a file
+    // Rename file
     for (int i = 0; i < current_directory->file_count; i++) {
         if (strcmp(current_directory->files[i].name, old_name) == 0) {
-            strcpy(current_directory->files[i].name, new_name);
+            strncpy(current_directory->files[i].name, new_name, MAX_FILE_NAME_SIZE);
+            current_directory->files[i].name[MAX_FILE_NAME_SIZE - 1] = '\0'; // Ensure null-termination
             write_to_disk();
             printf("File '%s' renamed to '%s'.\n", old_name, new_name);
             return;
         }
     }
-    printf("File or directory not found.\n");
+
+    printf("Error: File or directory '%s' not found.\n", old_name);
 }
+
 
 
 void read_block(int block_index) {
@@ -356,7 +382,7 @@ void simulate_fs_operations() {
         } else if (strncmp(command, "rname ", 6) == 0) {
             char old_name[MAX_FILE_NAME_SIZE];
             char new_name[MAX_FILE_NAME_SIZE];
-            sscanf(command + 7, "%s %s", old_name, new_name);
+            sscanf(command + 6, "%s %s", old_name, new_name);
             rename_file(old_name, new_name);
         } else if (strcmp(command, "exit") == 0) {
             break;
