@@ -85,18 +85,11 @@ void write_to_file(const char *name, const char *new_content) {
                 current_block = FAT[current_block];
             }
 
-            // If new content is smaller, clear the remaining blocks
-            if (bytes_written < file->size) {
-                int remaining_bytes = file->size - bytes_written;
-                while (current_block != FREE && remaining_bytes > 0) {
-                    int bytes_to_clear = (remaining_bytes < BLOCK_SIZE) ? remaining_bytes : BLOCK_SIZE;
-                    memset(virtual_disk[current_block], 0, bytes_to_clear);
-                    remaining_bytes -= bytes_to_clear;
-                    current_block = FAT[current_block];
-                }
+            // If new content is larger, update the file size
+            if (new_content_size > file->size) {
+                file->size = new_content_size;
             }
 
-            file->size = new_content_size;
             write_to_disk();
             printf("File '%s' overwritten successfully with new content.\n", name);
             return;

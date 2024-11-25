@@ -12,6 +12,7 @@ void change_directory(const char *name);
 void delete_file(const char *name);
 void delete_directory_recursive(int dir_index);
 void rename_file(const char *old_name, const char *new_name);
+void append_to_file(const char *name, const char *content);
 void read_block(int block_index);
 void write_block(int block_index, const char *content);
 void move_file_to_directory(const char *file_name, const char *dir_name);
@@ -222,6 +223,86 @@ void rename_file(const char *old_name, const char *new_name) {
     printf("Error: File or directory '%s' not found.\n", old_name);
 }
 
+//function to append new content to file 
+//should start reading the file and as soon as it reaches some unreadable character or null terminator, it should start writing the new content
+//then update the file size and write the changes to the disk
+
+void append_to_file(const char *name, const char *content) {
+    Directory *current_directory = &directories[current_directory_index];
+
+    // Locate the file in the current directory
+    for (int i = 0; i < current_directory->file_count; i++) {
+        if (strcmp(current_directory->files[i].name, name) == 0) {
+            File *file = &current_directory->files[i];
+
+            // Calculate sizes
+            int current_size = file->size;          // Current size of the file
+            int new_content_size = strlen(content); // Size of the new content
+            int total_size = current_size + new_content_size;
+
+            // Check if the total size exceeds the maximum allowed
+            if (total_size > MAX_FILE_SIZE * BLOCK_SIZE) {
+                printf("Error: File size exceeds maximum limit of 128 KB.\n");
+                return;
+            }
+
+            // Start appending content from the current size
+            int current_block = file->start_block;
+            int bytes_written = 0;
+            int block_offset = 0;
+
+            // Traverse blocks assigned to the file until the current size is reached
+            int bytes_to_skip = current_size;
+            while (bytes_to_skip > 0) {
+                block_offset = bytes_to_skip % BLOCK_SIZE;
+                bytes_to_skip -= BLOCK_SIZE;
+                if (bytes_to_skip > 0 || block_offset == 0) {
+                    current_block = FAT[current_block];
+                }
+            }
+
+            // Append content to the blocks
+            while (bytes_written < new_content_size) {
+                int bytes_to_write = (new_content_size - bytes_written < BLOCK_SIZE - block_offset)
+                                     ? new_content_size - bytes_written
+                                     : BLOCK_SIZE - block_offset;
+
+                // Write to the current block starting at the correct offset
+                memcpy(&virtual_disk[current_block][block_offset], &content[bytes_written], bytes_to_write);
+                bytes_written += bytes_to_write;
+
+                // Reset block offset after the first block
+                block_offset = 0;
+
+                // Move to a new block if needed
+                if (bytes_written < new_content_size) {
+                    if (FAT[current_block] == FREE) {
+                        int new_block = find_free_block();
+                        if (new_block == -1) {
+                            printf("Error: Disk is full.\n");
+                            return;
+                        }
+                        FAT[current_block] = new_block;
+                    }
+                    current_block = FAT[current_block];
+                }
+            }
+
+            // Update the file's size
+            file->size = total_size;
+
+            // Save changes to disk
+            write_to_disk();
+            printf("Content appended to file '%s' successfully.\n", name);
+            return;
+        }
+    }
+
+    // If the file is not found
+    printf("Error: File '%s' not found.\n", name);
+}
+
+
 void read_block(int block_index) {
     if (block_index < 0 || block_index >= MAX_BLOCKS) {
         printf("Error: Invalid block index.\n");
@@ -379,6 +460,7 @@ void simulate_fs_operations() {
             printf("  part\n");
             printf("  rname\n");
             printf("  move\n");
+            printf("  apfile\n");
             printf("  exit\n");
         } else if (strncmp(command, "touch ", 6) == 0) {
             char filename[MAX_FILE_NAME_SIZE];
@@ -433,6 +515,12 @@ void simulate_fs_operations() {
             char dir_name[MAX_FILE_NAME_SIZE];
             sscanf(command + 5, "%s %s", file_name, dir_name);
             move_file_to_directory(file_name, dir_name);
+        }
+        else if (strncmp(command, "apfile ", 7) == 0) {
+            char name[MAX_FILE_NAME_SIZE];
+            char content[1024];
+            sscanf(command + 7, "%s %[^\n]", name, content);
+            append_to_file(name, content);
         }
         else if (strcmp(command, "exit") == 0) {
             break;
