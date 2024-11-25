@@ -12,6 +12,7 @@
 #define MAX_FILE_SIZE 128  // Max file size in KB
 #define DIRECTORY_SIZE 128  // Max number of entries in the root directory
 #define FREE -1  // Representing free blocks
+#define USED -2  // Representing used blocks
 #define MAX_FILES 100
 #define MAX_DIRECTORIES 100
 #define DISK_FILE "disk.fs"

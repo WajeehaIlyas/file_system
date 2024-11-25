@@ -14,19 +14,19 @@ void delete_directory_recursive(int dir_index);
 void rename_file(const char *old_name, const char *new_name);
 void read_block(int block_index);
 void write_block(int block_index, const char *content);
+void move_file_to_directory(const char *file_name, const char *dir_name);
 void partition_file_system();
 void simulate_fs_operations();
 
 // Main function to interact with the system
 int main() {
+    initialize_fat();
+    initialize_dir_structure();
     initialize_disk();
     simulate_fs_operations();
     return 0;
 }
 
-/*
- * Initialize the FAT and root directory and ensure the disk file exists.
- */
 void initialize_disk() {
     FILE *disk = fopen(DISK_FILE, "rb+");
     if (disk == NULL) {
@@ -222,8 +222,6 @@ void rename_file(const char *old_name, const char *new_name) {
     printf("Error: File or directory '%s' not found.\n", old_name);
 }
 
-
-
 void read_block(int block_index) {
     if (block_index < 0 || block_index >= MAX_BLOCKS) {
         printf("Error: Invalid block index.\n");
@@ -259,27 +257,72 @@ void write_block(int block_index, const char *content) {
         printf("Error: Block %d is already in use by a file.\n", block_index);
         return;
     }
-
     int content_length = strlen(content);
-
-    // Check if the content fits in the block
-    if (content_length > BLOCK_SIZE) {
-        printf("Error: Content is too large for the block.\n");
-        return;
-    }
 
     // Write content to the virtual disk (update the specified block)
     memset(virtual_disk[block_index], 0, BLOCK_SIZE);
     strncpy(virtual_disk[block_index], content, content_length);
 
-    FAT[block_index] = -2;  // Mark block as used
-
-    // After writing to virtual_disk, persist the changes to the actual disk file
+    FAT[block_index] = USED;  // Mark block as used
+    // After writing to virtual_disk, persist the changes to the actual disk fi
     write_to_disk();  // This will save the changes to the disk
 
     printf("Block %d successfully updated with content: '%s'.\n", block_index, content);
 }
 
+
+void move_file_to_directory(const char *file_name, const char *dir_name) {
+    Directory *current_directory = &directories[current_directory_index];
+    int file_index = -1;
+
+    // Find the file in the current directory
+    for (int i = 0; i < current_directory->file_count; i++) {
+        if (strcmp(current_directory->files[i].name, file_name) == 0) {
+            file_index = i;
+            break;
+        }
+    }
+
+    if (file_index == -1) {
+        printf("Error: File '%s' not found in the current directory.\n", file_name);
+        return;
+    }
+
+    // Find the target directory
+    int target_dir_index = -1;
+    for (int i = 0; i < current_directory->child_count; i++) {
+        int child_index = current_directory->children[i];
+        if (strcmp(directories[child_index].name, dir_name) == 0) {
+            target_dir_index = child_index;
+            break;
+        }
+    }
+
+    if (target_dir_index == -1) {
+        printf("Error: Directory '%s' not found in the current directory.\n", dir_name);
+        return;
+    }
+
+    // Move the file to the target directory
+    Directory *target_dir = &directories[target_dir_index];
+    if (target_dir->file_count >= DIRECTORY_SIZE) {
+        printf("Error: Target directory is full.\n");
+        return;
+    }
+
+    // Add the file to the target directory
+    target_dir->files[target_dir->file_count] = current_directory->files[file_index];
+    target_dir->file_count++;
+
+    // Remove the file from the current directory
+    for (int i = file_index; i < current_directory->file_count - 1; i++) {
+        current_directory->files[i] = current_directory->files[i + 1];
+    }
+    current_directory->file_count--;
+
+    write_to_disk();
+    printf("File '%s' moved to directory '%s'.\n", file_name, dir_name);
+}
 
 
 void partition_file_system() {
@@ -335,6 +378,7 @@ void simulate_fs_operations() {
             printf("  wblock\n");
             printf("  part\n");
             printf("  rname\n");
+            printf("  move\n");
             printf("  exit\n");
         } else if (strncmp(command, "touch ", 6) == 0) {
             char filename[MAX_FILE_NAME_SIZE];
@@ -384,7 +428,13 @@ void simulate_fs_operations() {
             char new_name[MAX_FILE_NAME_SIZE];
             sscanf(command + 6, "%s %s", old_name, new_name);
             rename_file(old_name, new_name);
-        } else if (strcmp(command, "exit") == 0) {
+        } else if(strncmp(command, "move ", 5) == 0) {
+            char file_name[MAX_FILE_NAME_SIZE];
+            char dir_name[MAX_FILE_NAME_SIZE];
+            sscanf(command + 5, "%s %s", file_name, dir_name);
+            move_file_to_directory(file_name, dir_name);
+        }
+        else if (strcmp(command, "exit") == 0) {
             break;
         } else {
             printf("Invalid command. Type 'help' to see available commands.\n");

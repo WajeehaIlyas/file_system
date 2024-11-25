@@ -9,14 +9,14 @@ int current_directory_index;
 // Initialize the FAT, marking all blocks as free.
 void initialize_fat() {
     for (int i = 0; i < MAX_BLOCKS; i++) {
-        FAT[i] = FREE;
+        FAT[i] = -1;
     }
 }
 
 // Find a free block in the FAT to allocate for a new file.
 int find_free_block() {
     for (int i = 0; i < MAX_BLOCKS; i++) {
-        if (FAT[i] == FREE) {
+        if (FAT[i] == -1) {
             return i;
         }
     }

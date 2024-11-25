@@ -3,58 +3,58 @@
 #include "fat.h"
 
 int create_file(const char *name, const char *content) {
+    // Access the current directory
     Directory *current_directory = &directories[current_directory_index];
+    
+    // Check if the directory has space for a new file
     if (current_directory->file_count >= DIRECTORY_SIZE) {
         printf("Directory is full.\n");
         return -1;
     }
 
-    // Check if file already exists
+    // Check if a file with the same name exists in the current directory
     for (int i = 0; i < current_directory->file_count; i++) {
         if (strcmp(current_directory->files[i].name, name) == 0) {
-            printf("File already exists.\n");
+            printf("A file with this name already exists in the current directory.\n");
             return -1;
         }
     }
 
-    // Find free blocks for the file
+    // Find a free block to store the file content
     int start_block = find_free_block();
     if (start_block == -1) {
-        printf("Not enough space to create file.\n");
+        printf("Error: Not enough space to create the file.\n");
         return -1;
     }
 
-    // Create the file entry
+    // Create a new file entry
     File new_file;
     strncpy(new_file.name, name, MAX_FILE_NAME_SIZE);
-    new_file.size = strlen(content);  // Simplified to length of the content
+    new_file.name[MAX_FILE_NAME_SIZE - 1] = '\0'; // Ensure null termination
+    new_file.size = strlen(content); // Simplified to the length of content
     new_file.start_block = start_block;
 
-    // Save file to root directory
+    // Add the file entry to the current directory
     current_directory->files[current_directory->file_count] = new_file;
     current_directory->file_count++;
 
-    // Write content to the disk
+    // Write the file content to the simulated disk
     FILE *disk = fopen(DISK_FILE, "rb+");
-    fseek(disk, sizeof(FAT) + sizeof(Directory) + start_block * BLOCK_SIZE, SEEK_SET);
+    if (disk == NULL) {
+        printf("Error: Unable to access the disk.\n");
+        return -1;
+    }
+    fseek(disk, sizeof(FAT) + sizeof(Directory) * MAX_DIRECTORIES + start_block * BLOCK_SIZE, SEEK_SET);
     fwrite(content, 1, new_file.size, disk);
     fclose(disk);
 
-    // Update FAT and write back to disk
-    FAT[start_block] = 0; // Mark block as used
+    // Update the FAT to mark the block as used
+    FAT[start_block] = -2; // End-of-file marker
     write_to_disk();
 
-    printf("File '%s' created successfully.\n", name);
+    printf("File '%s' created successfully in the current directory.\n", name);
     return 0;
 }
-
-/*
- * List all files in the root directory.
- */
-
-/*
- * Delete a file from the root directory and free its associated blocks in FAT.
- */
 
 void write_to_file(const char *name, const char *new_content) {
     Directory *current_directory = &directories[current_directory_index];
@@ -64,60 +64,46 @@ void write_to_file(const char *name, const char *new_content) {
             File *file = &current_directory->files[i];
 
             int new_content_size = strlen(new_content);
-            if (new_content_size > MAX_FILE_SIZE) {
-                printf("Error: File size exceeds the maximum allowed size of 1 KB.\n");
+
+            if (new_content_size > MAX_FILE_SIZE * BLOCK_SIZE) {
+                printf("Error: File size exceeds maximum limit of 128 KB.\n");
                 return;
             }
 
+            // Overwrite the content of the file
             int current_block = file->start_block;
             int bytes_written = 0;
 
-            while (bytes_written < new_content_size) {
-                int offset = bytes_written % BLOCK_SIZE;
-                int bytes_to_write = BLOCK_SIZE - offset; // Write as much as possible in current block
-                if (bytes_written + bytes_to_write > new_content_size) {
-                    bytes_to_write = new_content_size - bytes_written;
-                }
+            while (current_block != FREE && bytes_written < new_content_size) {
+                int bytes_to_write = (new_content_size - bytes_written < BLOCK_SIZE)
+                                     ? new_content_size - bytes_written
+                                     : BLOCK_SIZE;
 
-                memcpy(&virtual_disk[current_block][offset], 
-                       &new_content[bytes_written], bytes_to_write);
+                memcpy(virtual_disk[current_block], &new_content[bytes_written], bytes_to_write);
+
                 bytes_written += bytes_to_write;
+                current_block = FAT[current_block];
+            }
 
-                // Allocate next block if needed
-                if (bytes_written < new_content_size) {
-                    if (FAT[current_block] == FREE) {
-                        int new_block = find_free_block();
-                        if (new_block == -1) {
-                            printf("Error: Not enough space to complete the write.\n");
-                            file->size = bytes_written; // Update to reflect written content
-                            write_to_disk();
-                            return;
-                        }
-                        FAT[current_block] = new_block;
-                        FAT[new_block] = FREE;
-                    }
+            // If new content is smaller, clear the remaining blocks
+            if (bytes_written < file->size) {
+                int remaining_bytes = file->size - bytes_written;
+                while (current_block != FREE && remaining_bytes > 0) {
+                    int bytes_to_clear = (remaining_bytes < BLOCK_SIZE) ? remaining_bytes : BLOCK_SIZE;
+                    memset(virtual_disk[current_block], 0, bytes_to_clear);
+                    remaining_bytes -= bytes_to_clear;
                     current_block = FAT[current_block];
                 }
             }
 
-            // Truncate unused blocks if new content is smaller
-            int next_block = FAT[current_block];
-            FAT[current_block] = FREE;
-            while (next_block != FREE) {
-                int temp = FAT[next_block];
-                FAT[next_block] = FREE; // Mark block as free
-                next_block = temp;
-            }
-
-            file->size = new_content_size; // Update file size
-            write_to_disk(); // Persist changes
-            printf("File '%s' content overwritten successfully.\n", name);
+            file->size = new_content_size;
+            write_to_disk();
+            printf("File '%s' overwritten successfully with new content.\n", name);
             return;
         }
     }
     printf("Error: File '%s' not found.\n", name);
 }
-
 
 void read_from_file(const char *name) {
     Directory *current_directory = &directories[current_directory_index];
