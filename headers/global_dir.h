@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define DISK_SIZE (64 * 1024 * 1024)  // 64 MB
 #define BLOCK_SIZE 1024               // 1 KB block
@@ -26,6 +27,7 @@ typedef struct {
     char name[MAX_FILE_NAME_SIZE];
     int size;
     int start_block;
+    time_t creation_time;
 } File;
 
 typedef struct {
@@ -35,6 +37,7 @@ typedef struct {
     File files[DIRECTORY_SIZE];
     int child_count;
     int children[MAX_DIRECTORIES];
+    time_t creation_time;
 } Directory;
 
 // Global root directory

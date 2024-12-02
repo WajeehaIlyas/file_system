@@ -16,6 +16,7 @@ void append_to_file(const char *name, const char *content);
 void read_block(int block_index);
 void write_block(int block_index, const char *content);
 void move_file_to_directory(const char *file_name, const char *dir_name);
+void get_file_info(const char *name);
 void partition_file_system();
 void simulate_fs_operations();
 
@@ -334,18 +335,29 @@ void write_block(int block_index, const char *content) {
         return;
     }
 
-    if (FAT[block_index] != FREE) {
-        printf("Error: Block %d is already in use by a file.\n", block_index);
-        return;
-    }
     int content_length = strlen(content);
 
     // Write content to the virtual disk (update the specified block)
     memset(virtual_disk[block_index], 0, BLOCK_SIZE);
     strncpy(virtual_disk[block_index], content, content_length);
 
+    // Update the file size if the block is part of a file
+    for (int i = 0; i < MAX_FILES; i++) {
+        for (int j = 0; j < directories[i].file_count; j++) {
+            File *file = &directories[i].files[j];
+            int current_block = file->start_block;
+            while (current_block != -1) {
+                if (current_block == block_index) {
+                    file->size = content_length;
+                    break;
+                }
+                current_block = FAT[current_block];
+            }
+        }
+    }
+
     FAT[block_index] = USED;  // Mark block as used
-    // After writing to virtual_disk, persist the changes to the actual disk fi
+    // After writing to virtual_disk, persist the changes to the actual disk file
     write_to_disk();  // This will save the changes to the disk
 
     printf("Block %d successfully updated with content: '%s'.\n", block_index, content);
@@ -431,10 +443,37 @@ void partition_file_system() {
     printf("Filesystem partitioned successfully. All data has been cleared.\n");
 }
 
+void get_file_info(const char *name) {
+    Directory *current_directory = &directories[current_directory_index];
 
-/*
- * Simulate a simple file system where we can create and manage files.
- */
+    // Check if it's a directory
+    for (int i = 0; i < current_directory->child_count; i++) {
+        int child_index = current_directory->children[i];
+        if (strcmp(directories[child_index].name, name) == 0) {
+            printf("Directory '%s' Information:\n", name);
+            printf("Parent Directory: %s\n", directories[child_index].parent_index == -1 ? "None" : directories[directories[child_index].parent_index].name);
+            printf("File Count: %d\n", directories[child_index].file_count);
+            printf("Child Count: %d\n", directories[child_index].child_count);
+            printf("Creation Time: %s", ctime(&directories[child_index].creation_time)); 
+            return;
+        }
+    }
+
+    // Check if it's a file
+    for (int i = 0; i < current_directory->file_count; i++) {
+        if (strcmp(current_directory->files[i].name, name) == 0) {
+            printf("File '%s' Information:\n", name);
+            printf("Size: %d bytes\n", current_directory->files[i].size);
+            printf("Start Block: %d\n", current_directory->files[i].start_block);
+              printf("Creation Time: %s", ctime(&current_directory->files[i].creation_time)); // Convert time_t to string
+            return;
+        }
+    }
+
+    printf("Error: File or directory '%s' not found.\n", name);
+}
+
+
 void simulate_fs_operations() {
     char command[100];
     printf("Simple FAT File System Simulator\n");
@@ -461,6 +500,7 @@ void simulate_fs_operations() {
             printf("  rname\n");
             printf("  move\n");
             printf("  apfile\n");
+            printf("  info\n");
             printf("  exit\n");
         } else if (strncmp(command, "touch ", 6) == 0) {
             char filename[MAX_FILE_NAME_SIZE];
@@ -521,6 +561,11 @@ void simulate_fs_operations() {
             char content[1024];
             sscanf(command + 7, "%s %[^\n]", name, content);
             append_to_file(name, content);
+        }
+        else if (strncmp(command, "info ", 5) == 0) {
+            char name[MAX_FILE_NAME_SIZE];
+            sscanf(command + 5, "%s", name);
+            get_file_info(name);
         }
         else if (strcmp(command, "exit") == 0) {
             break;

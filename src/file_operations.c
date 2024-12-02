@@ -184,3 +184,4 @@ void truncate_file(const char *name, int new_size) {
     }
     printf("Error: File '%s' not found.\n", name);
 }
+
